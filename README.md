@@ -1,0 +1,1 @@
+# check_mikrotik-by-ssh-ping-remote-ip
