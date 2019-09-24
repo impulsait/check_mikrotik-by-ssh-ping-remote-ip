@@ -10,13 +10,13 @@
 
 HOST_IP="$1"
 TEST_IP="$2"
-SSH_USER="${3:-icsupport}"
+SSH_USER="${3:-monitoring-user}"
 PLOSS_WARN="${4:-10}"
 PLOSS_CRIT="${5:-30}"
 AVGRTT_WARN="${6:-300}"
 AVGRTT_CRIT="${7:-1500}"
 PING_COUNT="${8:-10}"
-SSH_KEY="/var/lib/nagios/id_rsa.pub"
+SSH_KEY="/var/lib/nagios/id_rsa"
 
 SCRIPT="/ping count=$PING_COUNT interval=1 address=$TEST_IP"
 
