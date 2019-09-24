@@ -1,0 +1,52 @@
+#!/bin/sh
+#  Copyright (C) 2019 Elías Torres-Arroyo
+#  https://www.comglobalit.com
+
+# # to be added in commands.cfg
+# define command {
+#        command_name    check_mikrotik-by-ssh-ping-remote-ip
+#        command_line    /usr/local/bin/mikrotik-by-ssh-ping-remote-ip '$HOSTADDRESS$' '$ARG1$' '$ARG2$' '$ARG3$' '$ARG4$' '$ARG5$' '$ARG6$' '$ARG7$' '$ARG8$'
+# }
+
+HOST_IP="$1"
+TEST_IP="$2"
+SSH_USER="${3:-icsupport}"
+PLOSS_WARN="${4:-10}"
+PLOSS_CRIT="${5:-30}"
+AVGRTT_WARN="${6:-300}"
+AVGRTT_CRIT="${7:-1500}"
+PING_COUNT="${8:-10}"
+SSH_KEY="/var/lib/nagios/id_rsa.pub"
+
+SCRIPT="/ping count=$PING_COUNT interval=1 address=$TEST_IP"
+
+OUTPUT=`/usr/bin/ssh  $SSH_USER@$HOST_IP -i $SSH_KEY $SCRIPT | grep sent -A1 | tr -d '[\r\n]'`
+[ $? -ne 0 ] && exit 3
+
+# example: sent=4 received=4 packet-loss=0% min-rtt=115ms avg-rtt=135ms 
+OUT_PERF_DATA=`echo $OUTPUT | sed 's/ms//g;s/%//g;s/\r\n//'`
+
+PLOSS=`echo $OUT_PERF_DATA  | awk '{print $3}' | cut -d= -f2`
+AVGRTT=`echo $OUT_PERF_DATA | awk '{print $5}' | cut -d= -f2`
+
+if [ $PLOSS -lt $PLOSS_WARN -a ${AVGRTT:-100000} -lt $AVGRTT_WARN ];
+then
+  STATUS=0
+elif [ $PLOSS -lt $PLOSS_CRIT -a ${AVGRTT:-100000} -lt $AVGRTT_CRIT ];
+then
+  STATUS=1
+else
+  STATUS=2
+fi
+
+# sent=10 received=10 packet-loss=0 min-rtt=5 avg-rtt=24 max-rtt=98
+SENT=`echo $OUT_PERF_DATA  | awk '{print $1}' | cut -d= -f2`
+RCVD=`echo $OUT_PERF_DATA  | awk '{print $2}' | cut -d= -f2`
+MINRTT=`echo $OUT_PERF_DATA  | awk '{print $4}' | cut -d= -f2`
+MAXRTT=`echo $OUT_PERF_DATA  | awk '{print $6}' | cut -d= -f2`
+
+PERF_DATA="sent=$SENT rcvd=$RCVD packet-loss=${PLOSS}%;$PLOSS_WARN;$PLOSS_CRIT avg-rtt=${AVGRTT:-$AVGRTT_CRIT}ms;$AVGRTT_WARN;$AVGRTT_CRIT min-rtt=${MINRTT}ms max-rtt=${MAXRTT}ms"
+
+# TODO: Add thresholds to performance data ~ elias
+echo "Ping to $TEST_IP: ${AVGRTT:-INF}ms/warn=${AVGRTT_WARN}ms/crit=${AVGRTT_CRIT}ms, Packet Loss: ${PLOSS}%/warn=${PLOSS_WARN}%/crit=${PLOSS_CRIT}%, count=$PING_COUNT|$PERF_DATA"
+exit $STATUS
